@@ -85,6 +85,7 @@ void write_file(char *file) {
   }
   fstat(c_fd, &info);
   if (c_fd >= 0 && (info.st_mode & S_IFREG)) {
+    dup2(c_fd, 1);
     write(c_fd, str, size);
   } else {
     printf("Error occured. check: %s\n", file);
@@ -93,7 +94,7 @@ void write_file(char *file) {
 }
 
 int main(int argc, char const *argv[]) {
-  int i;
+  int i, j;
   int pid;
   int stats;
   char *tokens[BUF_SIZE];
@@ -127,11 +128,16 @@ int main(int argc, char const *argv[]) {
         }
         if (strncmp(tokens[i], ">\0", 2) == 0) {
           write_file(tokens[i + 1]);
+          for (j = i; j < TOKEN_SIZE; ++j){
+            if (j + 2 < TOKEN_SIZE) {
+              tokens[j] = tokens[j + 2];
+            } else {
+              tokens[j] = "";
+            }
+          }
         }
-      }
-
-      for (i = 0; i < TOKEN_SIZE; ++i){
-        printf("%s\n", tokens[i]);
+        if (strncmp(tokens[i], "|\0", 2) == 0) {
+        }
       }
 
       pid = fork();
