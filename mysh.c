@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
+#include <errno.h>
 
 #define BUF_SIZE 256
 
@@ -32,10 +33,6 @@ void devide_tokens(char *buf, char *tokens[]) {
   }
 
   tokens[i] = NULL;
-}
-
-void setup_shell() {
-  write(1, "mysh> ", sizeof("mysh> "));
 }
 
 //
@@ -65,7 +62,7 @@ int main(int argc, char const *argv[]) {
   read_path();
 
   while(1){
-    setup_shell();
+    write(1, "mysh> ", sizeof("mysh> "));
     read(0, buf, BUF_SIZE);
 
     // replace \n with \0
@@ -88,9 +85,9 @@ int main(int argc, char const *argv[]) {
         write(2, "failed to fork\n", 15);
       } else if (pid == 0) {
         execvp(tokens[0], tokens);
+        printf("%s: %s\n", tokens[0], strerror(errno));
       }
       waitpid(pid, &stats, 0);
-
     }
 
   }
