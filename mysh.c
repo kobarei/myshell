@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <stdbool.h>
 #include <stdarg.h>
 #include <unistd.h>
@@ -11,94 +12,88 @@
 
 #define BUF_SIZE 256
 
-bool prom = true;
+char *PATH;
 struct stat info;
-bool cmd_aru = false;
+char buf[BUF_SIZE];
 
-bool is_exist(char *path_cmd);
-char *build_path(char *cmd);
+void devide_tokens(char *buf, char *tokens[]) {
+  int i = 0;
+  char *tmp = NULL;
+
+  tmp = strtok(buf, " ");
+  tokens[i] = tmp;
+  i++;
+  while(tmp != NULL){
+    tmp = strtok(NULL, " ");
+    if (tmp != NULL) {
+      tokens[i] = tmp;
+      i++;
+    }
+  }
+
+  tokens[i] = NULL;
+}
+
+void setup_shell() {
+  write(1, "mysh> ", sizeof("mysh> "));
+}
+
+//
+// read path file
+//
+void read_path() {
+  int f_fd;
+  char path_set[BUF_SIZE];
+
+  f_fd = open(".path", O_RDONLY);
+  if (f_fd == -1) {
+    printf(".path Not Found\n");
+  } else {
+    read(f_fd, path_set, sizeof(path_set));
+    close(f_fd);
+    PATH = path_set;
+    setenv("PATH", PATH, 0);
+  }
+}
 
 int main(int argc, char const *argv[]) {
-  static char cmd[BUF_SIZE];
-  char path_cmd[BUF_SIZE];
-  char *args[BUF_SIZE];
+  int i;
   int pid;
   int stats;
+  char *tokens[BUF_SIZE];
 
-  while(prom){
-    strcpy(path_cmd, "");
-    write(1, "mysh> ", 6);
-    read(0, cmd, BUF_SIZE);
-    if (strncmp(cmd, "\n", 1) != 0) {
-      strcpy(&cmd[strlen(cmd) - 1], "\0");
-      if (strcmp(cmd, "exit") == 0)
+  read_path();
+
+  while(1){
+    setup_shell();
+    read(0, buf, BUF_SIZE);
+
+    // replace \n with \0
+    for (i = 0; i < strlen(buf); ++i){
+      if (strncmp(&buf[i], "\n", 1) == 0) {
+        strncpy(&buf[i], "\0", 1);
         break;
-
-      strcpy(path_cmd, build_path(cmd));
-
-      if (cmd_aru) {
-        args[0] = cmd;
-        args[1] = NULL;
-        pid = fork();
-        if (pid == -1) {
-          write(2, "failed to fork\n", 15);
-        } else if (pid == 0) {
-          execv(path_cmd, args);
-        }
-        waitpid(pid, &stats, 0);
-      } else {
-        printf("%s: Command Not Found\n", cmd);
       }
+    }
+
+    if (strncmp(buf, "\0", 1) != 0) {
+      if (strcmp(buf, "exit") == 0) {
+        break;
+      }
+
+      devide_tokens(buf, tokens);
+
+      pid = fork();
+      if (pid == -1) {
+        write(2, "failed to fork\n", 15);
+      } else if (pid == 0) {
+        execvp(tokens[0], tokens);
+      }
+      waitpid(pid, &stats, 0);
+
     }
 
   }
 
   return 0;
-}
-
-//
-// is_exist command
-//
-bool is_exist(char *path_cmd) {
-  int fd;
-
-  cmd_aru = false;
-  fd = open(path_cmd, O_RDONLY);
-  if (fd >= 0) {
-    cmd_aru = true;
-  }
-  close(fd);
-
-  return cmd_aru;
-}
-
-//
-// path + cmd
-//
-char *build_path(char *cmd) {
-  static char str[BUF_SIZE];
-  static char path_cmd[BUF_SIZE];
-  int f_fd;
-  int i;
-
-  f_fd = open(".path", O_RDONLY);
-  read(f_fd, str, sizeof(str));
-  close(f_fd);
-
-  strcpy(path_cmd, "");
-
-  for (i = 0; i < strlen(str); ++i){
-    if (strncmp(&str[i], ";", 1) == 0) {
-      strcat(path_cmd, cmd);
-      if (is_exist(path_cmd)) {
-        break;
-      } else {
-        strcpy(path_cmd, "");
-      }
-    } else {
-      strncat(path_cmd, &str[i], 1);
-    }
-  }
-
-  return path_cmd;
 }
