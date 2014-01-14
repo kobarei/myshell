@@ -14,25 +14,28 @@
 #define BUF_SIZE 256
 
 char *PATH;
-struct stat info;
 char buf[BUF_SIZE];
+int TOKEN_SIZE;
 
+//
+// devide each token with space from input stream
+//
 void devide_tokens(char *buf, char *tokens[]) {
-  int i = 0;
   char *tmp = NULL;
+  TOKEN_SIZE = 0;
 
   tmp = strtok(buf, " ");
-  tokens[i] = tmp;
-  i++;
+  tokens[TOKEN_SIZE] = tmp;
+  TOKEN_SIZE++;
   while(tmp != NULL){
     tmp = strtok(NULL, " ");
     if (tmp != NULL) {
-      tokens[i] = tmp;
-      i++;
+      tokens[TOKEN_SIZE] = tmp;
+      TOKEN_SIZE++;
     }
   }
 
-  tokens[i] = NULL;
+  tokens[TOKEN_SIZE] = NULL;
 }
 
 //
@@ -51,6 +54,42 @@ void read_path() {
     PATH = path_set;
     setenv("PATH", PATH, 0);
   }
+}
+
+char *open_file(char *file) {
+  int size, f_fd;
+  char *text;
+  struct stat info;
+
+  f_fd = open(file, O_RDONLY);
+  fstat(f_fd, &info);
+  if (f_fd >= 0 && (info.st_mode & S_IFREG)) {
+    read(f_fd, text, sizeof(text));
+  } else {
+    printf("Error occured. check: %s\n", file);
+  }
+  close(f_fd);
+
+  return text;
+}
+
+void write_file(char *file) {
+  char str[256];
+  int size, c_fd;
+  struct stat info;
+
+  c_fd = open(file, O_WRONLY);
+  if (c_fd < 0) {
+    creat(file, 0644);
+    c_fd = open(file, O_WRONLY);
+  }
+  fstat(c_fd, &info);
+  if (c_fd >= 0 && (info.st_mode & S_IFREG)) {
+    write(c_fd, str, size);
+  } else {
+    printf("Error occured. check: %s\n", file);
+  }
+  close(c_fd);
 }
 
 int main(int argc, char const *argv[]) {
@@ -80,6 +119,21 @@ int main(int argc, char const *argv[]) {
 
       devide_tokens(buf, tokens);
 
+      for (i = 0; i < TOKEN_SIZE; ++i){
+        if (strncmp(tokens[i], "<\0", 2) == 0) {
+          // strcpy(tokens[i], open_file(tokens[i + 1]));
+          // tokens[i] = open_file(tokens[i + 1]);
+          printf("%s\n", open_file(tokens[i + 1]));
+        }
+        if (strncmp(tokens[i], ">\0", 2) == 0) {
+          write_file(tokens[i + 1]);
+        }
+      }
+
+      for (i = 0; i < TOKEN_SIZE; ++i){
+        printf("%s\n", tokens[i]);
+      }
+
       pid = fork();
       if (pid == -1) {
         write(2, "failed to fork\n", 15);
@@ -89,7 +143,6 @@ int main(int argc, char const *argv[]) {
       }
       waitpid(pid, &stats, 0);
     }
-
   }
 
   return 0;
